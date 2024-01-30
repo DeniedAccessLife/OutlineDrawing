@@ -1,4 +1,6 @@
-﻿#include <stdio.h>
+﻿//В 8-битном ВМР – файле, представляющем изображение красного квадрата 64Х64 пикселей, нарисовать зеленую рамку.
+
+#include <stdio.h>
 #include <stdlib.h>
 #pragma pack(push, 1)
 
@@ -34,14 +36,14 @@ struct tagRGBQUAD
 	BYTE rgbReserved;
 };
 
-void ReadAndWriteHeader(FILE *file_read, FILE *file_write, BitMapHeader *header)
+void ReadAndWriteHeader(FILE* file_read, FILE* file_write, BitMapHeader* header)
 {
 	fseek(file_read, 0, SEEK_SET);
 	fread(header, sizeof(BitMapHeader), 1, file_read);
 	fwrite(header, sizeof(BitMapHeader), 1, file_write);
 }
 
-void ReadAndWriteQuad(FILE *file_read, FILE *file_write, int size, tagRGBQUAD *RGB)
+void ReadAndWriteQuad(FILE* file_read, FILE* file_write, int size, tagRGBQUAD* RGB)
 {
 	fseek(file_read, size, SEEK_SET);
 	fread(RGB, 1024, 1, file_read);
@@ -56,10 +58,10 @@ int main()
 
 	// Имена файлов для чтения и записи
 	char filename_read[] = "original.bmp";
-	char filename_write[] = "patched.bmp";
+	char filename_write[] = "processed.bmp";
 
 	// Открытие файла для чтения
-	FILE *file_read;
+	FILE* file_read;
 	fopen_s(&file_read, filename_read, "rb");
 
 	// Проверка, открылся ли файл для чтения
@@ -70,7 +72,7 @@ int main()
 	}
 
 	// Открытие файла для записи
-	FILE *file_write;
+	FILE* file_write;
 	fopen_s(&file_write, filename_write, "wb");
 
 	// Проверка, открылся ли файл для записи
@@ -85,11 +87,12 @@ int main()
 	ReadAndWriteQuad(file_read, file_write, header.biSize + 14, RGBQuad);
 
 	// Вывод информации о исходном файле
-	printf("Image dimensions: %u x %u\n", header.biWidth, header.biHeight);
+	printf("Bit count: %d bit\n", header.biBitCount);
 	printf("Original file size: %u bytes\n", header.bfSize);
+	printf("Image dimensions: %u x %u\n", header.biWidth, header.biHeight);
 
 	// Поиск зеленого цвета в палитре
-	int green = NULL;
+	int green = 0;
 	for (int i = 0; i < 256; i++)
 	{
 		if (RGBQuad[i].rgbRed == 0 && RGBQuad[i].rgbGreen == 255 && RGBQuad[i].rgbBlue == 0)
@@ -110,28 +113,26 @@ int main()
 	fseek(file_read, header.bfOffbits, SEEK_SET);
 	fseek(file_write, header.bfOffbits, SEEK_SET);
 
-	// Обход каждого пикселя изображения
-	for (DWORD y = 0; y < header.biHeight; y++)
-	{
-		for (DWORD x = 0; x < header.biWidth; x++)
-		{
-			// Чтение пикселя из файла
-			BYTE temp;
-			fread(&temp, 1, 1, file_read);
+	// Создаем буфер для пикселей
+	BYTE *pixels = new BYTE[header.biHeight * header.biWidth];
 
-			// Проверка, находится ли пиксель на границе изображения
-			if (x < 1 || x >= header.biWidth - 1 || y < 1 || y >= header.biHeight - 1)
-			{
-				// Если да, запись зеленого цвета в файл
-				fwrite(&green, 1, 1, file_write);
-			}
-			else
-			{
-				// Если нет, запись исходного цвета пикселя в файл
-				fwrite(&temp, 1, 1, file_write);
-			}
+	// Читаем все пиксели в буфер
+	fread(pixels, header.biHeight * header.biWidth, 1, file_read);
+
+	// Обрабатываем пиксели
+	for (int i = 0; i < header.biHeight * header.biWidth; i++)
+	{
+		int x = i % header.biWidth;
+		int y = i / header.biWidth;
+
+		if (x < 1 || x >= header.biWidth - 1 || y < 1 || y >= header.biHeight - 1)
+		{
+			pixels[i] = green;
 		}
 	}
+
+	// Записываем обработанные пиксели обратно в файл
+	fwrite(pixels, header.biHeight * header.biWidth, 1, file_write);
 
 	// Закрытие файлов
 	fclose(file_read);
